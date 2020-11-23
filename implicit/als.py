@@ -139,6 +139,12 @@ class AlternatingLeastSquares(MatrixFactorizationBase):
             Whether to show a progress bar during fitting
         """
 
+        train_loss = []
+        valid_precision = []
+        valid_map = []
+        valid_ndcg = []
+        valid_auc = []
+
         if self.use_validation is True:
             item_users, vali_item_users = train_test_split(
                 item_users, 1.0 - self.validate_proportion)
@@ -194,6 +200,7 @@ class AlternatingLeastSquares(MatrixFactorizationBase):
                 if self.calculate_training_loss:
                     loss = _als.calculate_loss(Cui, self.user_factors, self.item_factors,
                                                self.regularization, num_threads=self.num_threads)
+                    train_loss.append(loss)
                     progress.set_postfix({"loss": loss})
 
                 if self.fit_callback:
@@ -201,6 +208,10 @@ class AlternatingLeastSquares(MatrixFactorizationBase):
 
                 if self.use_validation and ((iteration + 1) % self.validate_step) == 0:
                     vali_res = self.validate(Cui, vali_user_items, self.validate_N)
+                    valid_precision.append(vali_res["precision"])
+                    valid_map.append(vali_res["map"])
+                    valid_ndcg.append(vali_res["ndcg"])
+                    valid_auc.append(vali_res["auc"])
                     log.info(
                         "[iter %d] Precision %0.4f MAP %0.4f NDCG %0.4f AUC %0.4f" %
                         (iteration,
@@ -211,6 +222,16 @@ class AlternatingLeastSquares(MatrixFactorizationBase):
 
         if self.calculate_training_loss:
             log.info("Final training loss %.4f", loss)
+
+        metrics = {
+          "train_loss": train_loss,
+          "valid_precision": valid_precision,
+          "valid_map": valid_map,
+          "valid_ndcg": valid_ndcg,
+          "valid_auc": valid_auc
+        }
+
+        return metrics
 
     def _fit_gpu(self, Ciu_host, Cui_host, vali_user_items, show_progress=True):
         """ specialized training on the gpu. copies inputs to/from cuda device """
